@@ -16,7 +16,7 @@ import requests
 from settings import *
 
 
-"""Yet another OKCupid data mining library.
+"""Yet another OKCupid data mining thing.
 
 If you want to use this software to interact with www.okcupid.com,
 please first read and make sure you are complying with their terms of
