@@ -1,74 +1,14 @@
-#!/usr/bin/env python2
-
 from __future__ import division
 
-import os
 import json
 import time
-import sys
-import argparse
-import json
 import re
 from collections import Counter
 
 import requests
 
-from settings import *
+import settings
 
-
-"""Yet another OKCupid data mining thing.
-
-If you want to use this software to interact with www.okcupid.com,
-please first read and make sure you are complying with their terms of
-service.
-
-https://www.okcupid.com/legal/terms
-
-Dependencies:
-* Requests -- http://docs.python-requests.org
-
-This library was developed for personal use rather than as a reusable
-API for others, so no complaining now.
-
-Instructions for use:
-
-1. Copy the settings_example.py file to settings.py and modify its
-   contents appropriately.
-
-2. Find users:
-   $ python okc.py --outpath=usernames.txt find
-
-3. Scrape profiles from usernames found in usernames.txt into path 'profiles':
-   $ python okc.py --outpath=profiles scrape usernames.txt
-
-   If the scraper aborts prematurely, you can resume like so:
-   $ python okc.py --outpath=profiles scrape usernames.json
-
-Note that the default settings in settings.py will retrieve hopefully
-almost all users in a 25 m/km radius from you. If you provide your login
-credentials here you can omit them from the commandline.
-
-If you run the scraper when not in private browsing mode, you'll also
-happen to show up in their visited list. Turns out this is a useful
-way to be seen by a lot of people. If you run it over an exhaustive
-search for users in an area, be prepared for some interesting and
-potentially offensive responses, you'll be visiting people with whom
-you have drastically low match ratings (and likely radically different
-life outlooks), and to them it will look like you intentionally
-clicked on them.
-
-Note that if you want to exhaustively find all users in an area using
-find mode, you need to have an A-List subscription in order to access
-the random search ranking. With this we can get around the 1000
-profile limit on each search by repeating the random search until no
-new users are returned.
-
-I'm not sure what happens if you try and use the RANDOM ranking (which
-the find mode assumes you have without an A-List subscription. I
-haven't checked if they've been thorough and applied the A-List
-restrictions to the API as well as the front end.
-
-"""
 
 PROFILE_URL = u'https://www.okcupid.com/profile/{username}'
 LOGIN_URL = 'http://www.okcupid.com/login'
@@ -92,20 +32,6 @@ MATCH_ORDERS = (
     'MATCH_AND_LOGIN',
     'MATCH_AND_DISTANCE',
 )
-
-
-def argparser():
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument("--username", default=USERNAME)
-    argparser.add_argument("--password", default=PASSWORD)
-    argparser.add_argument("--outpath", default=os.getcwd())
-    subparsers = argparser.add_subparsers(dest='command')
-
-    ap1 = subparsers.add_parser('find')
-    ap2 = subparsers.add_parser('scrape')
-    ap2.add_argument("--resume", action='store_true')
-    ap2.add_argument("inpath", metavar='USERNAME_PATH')
-    return argparser
 
 
 class OkcError(Exception):
@@ -235,7 +161,7 @@ def load_users(path):
 class Session(object):
     """Class for interacting with okcupid.com."""
     
-    def __init__(self, username=USERNAME, password=PASSWORD):
+    def __init__(self, username=settings.USERNAME, password=settings.PASSWORD):
         """Logs into okcupid.com. Uses parameters for logging in if provided,
         otherwise defaults to credentials specified in settings.py.
 
@@ -253,8 +179,8 @@ class Session(object):
         r = requests.post(LOGIN_URL, params=params, headers=HEADERS)
         self.cookies = r.cookies
         
-    def search(self, count=1000, matchorder='MATCH', locid=0, distance=DISTANCE, 
-               min_age=MIN_AGE, max_age=MAX_AGE, gender='all', orientation='all',
+    def search(self, count=1000, matchorder='MATCH', locid=0, distance=settings.DISTANCE, 
+               min_age=settings.MIN_AGE, max_age=settings.MAX_AGE, gender='all', orientation='all',
                time='year'):
         """Make a search GET request to OKC API. Note: POST does not work.
         Returns a dictionary with the following keys:
@@ -354,7 +280,7 @@ class Session(object):
                 print "NO SUCH USER: {}".format(username)
             except requests.ConnectionError as error:
                 print "CONNECTION ERROR: {}".format(username)
-            time.sleep(SLEEP_TIME)
+            time.sleep(settings.SLEEP_TIME)
 
     def visit_profiles(self, usernames):
         """Retrieves the profiles of a sequence of usernames. Nothing is done
@@ -370,7 +296,7 @@ class Session(object):
                 print "NO SUCH USER: {}".format(username)
             except requests.ConnectionError as error:
                 print "CONNECTION ERROR: {}".format(username)
-            time.sleep(SLEEP_TIME)
+            time.sleep(settings.SLEEP_TIME)
 
     def find_and_visit_profiles(self, cutoff=None, threshold=None, **kwargs):
         """Perform a search for users and then visit their profiles.
@@ -409,7 +335,7 @@ class Session(object):
             num_after = len(usernames)
             num_found = num_after - num_before 
             print "Found {} new users".format(num_found)
-            time.sleep(SLEEP_TIME)
+            time.sleep(settings.SLEEP_TIME)
         return usernames
 
     def find_all_users(self, binsize=5, **kwargs):
@@ -428,10 +354,10 @@ class Session(object):
         usernames = set()
         pairs = []
 
-        curr = MIN_AGE
-        while curr <= MAX_AGE:
-            if curr + binsize > MAX_AGE:
-                this_max = MAX_AGE
+        curr = settings.MIN_AGE
+        while curr <= settings.MAX_AGE:
+            if curr + binsize > settings.MAX_AGE:
+                this_max = settings.MAX_AGE
             else:
                 this_max = curr + binsize
             pairs.append((curr, this_max))
@@ -446,22 +372,3 @@ class Session(object):
             print "===================================="
             print "Found {} users in age bracket {},{}\n".format(len(found), min_age, max_age)
         return usernames
-
-
-def main():
-    args = argparser().parse_args()
-    session = Session(username=args.username, password=args.password)
-
-    if args.command == 'find':
-        usernames = session.find_all_users()
-        with open(args.outpath, 'w') as file:
-            file.write('\n'.join(usernames).encode('utf8'))
-    elif args.command == 'scrape':
-        with open(args.inpath) as file:
-            usernames = set(file.read().decode('utf').split())
-        session.dump_profiles(usernames, args.outpath, resume=args.resume)
-
-    
-if __name__ == "__main__":
-    sys.exit(main())
-    

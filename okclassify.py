@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+
 
 from __future__ import division
 
@@ -14,6 +15,7 @@ from sklearn.cross_validation import train_test_split, StratifiedKFold
 from sklearn.feature_selection import SelectKBest, chi2, f_classif
 from sklearn import metrics
 
+import okc
 
 class L1LinearSVC(LinearSVC):
 
@@ -59,7 +61,6 @@ class RunTrainTest(object):
     Scikit learn documentation suggests that tf-idf values for shorter 
     documents can be noiser and in this case using binary feature 
     can be more stable
-
 
     To do next:
       * inspect most informative features
@@ -218,7 +219,7 @@ class RunTrainTest(object):
 
     
 def main():
-    users = load_users('data/json/corpus')
+    users = okc.load_users('data/json/corpus')
     run = RunTrainTest(users, label='match')
 
 if __name__ == "__main__":
