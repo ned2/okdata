@@ -1,4 +1,4 @@
-# okc-scraper
+# okdata
 Yet another OKCupid data mining tool. 
 
 A tool for learning interesting things about the dating pool in an
