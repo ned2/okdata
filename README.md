@@ -2,7 +2,7 @@
 Yet another OKCupid data mining tool. 
 
 A tool for learning interesting things about the dating pool in an
-area. Scrapes Supports scraping OKCupid user profiles in JSON format
+area. Supports scraping OKCupid user profiles in JSON format
 and then doing things with the data. The things are a work in
 progress.
 
