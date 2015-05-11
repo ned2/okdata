@@ -3,6 +3,7 @@ from __future__ import division
 import json
 import time
 import re
+import os
 from collections import Counter
 
 import requests
@@ -17,7 +18,7 @@ QUICKMATCH_URL = 'https://www.okcupid.com/quickmatch/{username}'
 VISITORS_URL = 'https://www.okcupid.com/visitors/{username}' 
 
 HEADERS = {
-    'User-agent' : USER_AGENT,
+    'User-agent' : settings.USER_AGENT,
     'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
 }
 
@@ -261,7 +262,7 @@ class Session(object):
         result = requests.get(url, cookies=self.cookies, params=params)
         if result.status_code != requests.codes.ok:
             message = u"Error getting profile: {}\n{}".format(username, result.text)
-            raise OKCNoSuchUserError(message)
+            raise OkcNoSuchUserError(message)
         return result.json()
 
     def dump_profiles(self, usernames, path, resume=False):
@@ -276,7 +277,7 @@ class Session(object):
                     json_string = json.dumps(user).encode('utf8')
                     file.write(json_string)
                 print u"{}: Wrote {}".format(count+1, username)
-            except OKCNoSuchUserError as error:
+            except OkcNoSuchUserError as error:
                 print "NO SUCH USER: {}".format(username)
             except requests.ConnectionError as error:
                 print "CONNECTION ERROR: {}".format(username)
@@ -292,7 +293,7 @@ class Session(object):
             try:
                 user = self.get_profile(username)
                 print u"{}: Visited {}".format(count+1, username)
-            except OKCNoSuchUserError as error:
+            except OkcNoSuchUserError as error:
                 print "NO SUCH USER: {}".format(username)
             except requests.ConnectionError as error:
                 print "CONNECTION ERROR: {}".format(username)

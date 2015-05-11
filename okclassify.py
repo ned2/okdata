@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
 
-
 from __future__ import division
+
+import sys
+import argparse
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB, BernoulliNB
@@ -17,6 +19,13 @@ from sklearn import metrics
 
 import okc
 
+
+def argparser():
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("path")
+    return argparser
+
+     
 class L1LinearSVC(LinearSVC):
 
     def fit(self, X, y):
@@ -219,9 +228,11 @@ class RunTrainTest(object):
 
     
 def main():
-    users = okc.load_users('data/json/corpus')
-    run = RunTrainTest(users, label='match')
+    args = argparser().parse_args()
+    users = okc.load_users(args.path)
+    run = RunTrainTest(users, label_type='match')
 
+    
 if __name__ == "__main__":
     sys.exit(main())
 

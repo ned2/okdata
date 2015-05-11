@@ -25,13 +25,13 @@ Instructions for use:
    contents appropriately.
 
 2. Find users:
-   $ python okscraper.py --outpath=usernames.txt find
+   $ python okscraper.py find usernames.txt
 
 3. Scrape profiles from usernames found in usernames.txt into path 'profiles':
-   $ python okscraper.py --outpath=profiles scrape usernames.txt
+   $ python okscraper.py scrape usernames.txt profiles
 
    If the scraper aborts prematurely, you can resume like so:
-   $ python okscraper.py --outpath=profiles scrape usernames.json
+   $ python okscraper.py scrape --resume usernames.txt profiles
 
 Note that the default settings in settings.py will retrieve hopefully
 almost all users in a 25 m/km radius from you. If you provide your login
@@ -64,13 +64,16 @@ def argparser():
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--username", default=settings.USERNAME)
     argparser.add_argument("--password", default=settings.PASSWORD)
-    argparser.add_argument("--outpath", default=os.getcwd())
     subparsers = argparser.add_subparsers(dest='command')
 
     ap1 = subparsers.add_parser('find')
+    ap1.add_argument("outpath", default=os.getcwd(), metavar='OUTPUTPATH')
+
     ap2 = subparsers.add_parser('scrape')
-    ap2.add_argument("--resume", action='store_true')
     ap2.add_argument("inpath", metavar='USERNAME_PATH')
+    ap2.add_argument("outpath", default=os.getcwd(), metavar='OUTPUTPATH')
+    ap2.add_argument("--resume", action='store_true')
+
     return argparser
 
 
