@@ -5,4 +5,3 @@ MIN_AGE = 18
 MAX_AGE = 99
 DISTANCE = 25
 SLEEP_TIME = 0.5
-LOCATIONS = {'melbourne' : 976925}

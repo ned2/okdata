@@ -62,17 +62,20 @@ restrictions to the API as well as the front end.
 
 def argparser():
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--username", default=settings.USERNAME)
-    argparser.add_argument("--password", default=settings.PASSWORD)
     subparsers = argparser.add_subparsers(dest='command')
 
     ap1 = subparsers.add_parser('find')
-    ap1.add_argument("outpath", default=os.getcwd(), metavar='OUTPUTPATH')
+    ap1.add_argument("--location", default=None)
 
     ap2 = subparsers.add_parser('scrape')
     ap2.add_argument("inpath", metavar='USERNAME_PATH')
-    ap2.add_argument("outpath", default=os.getcwd(), metavar='OUTPUTPATH')
     ap2.add_argument("--resume", action='store_true')
+    
+    # arguments common to both
+    for subparser in (ap1, ap2):
+        subparser.add_argument("--username", default=settings.USERNAME)
+        subparser.add_argument("--password", default=settings.PASSWORD)
+        subparser.add_argument("outpath", default=os.getcwd(), metavar='OUTPUTPATH')
 
     return argparser
 
@@ -82,7 +85,7 @@ def main():
     session = okc.Session(username=args.username, password=args.password)
 
     if args.command == 'find':
-        usernames = session.find_all_users()
+        usernames = session.find_all_users(location=args.location)
         with open(args.outpath, 'w') as file:
             file.write('\n'.join(usernames).encode('utf8'))
     elif args.command == 'scrape':

@@ -22,6 +22,12 @@ HEADERS = {
     'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
 }
 
+LOCATIONS = {
+    'melbourne' : 976925,
+    'san_francisco' : 4265540,
+}
+
+
 MATCH_ORDERS = (
     'MATCH',
     'SPECIAL_BLEND',
@@ -65,6 +71,7 @@ class User(object):
     essay_titles    list of essay titles (strings)
     essays          list of essay contents (strings)
     text            combined text from all essays (string)
+    tokens
     num_tokens      number of tokens used in all essays (int)
     token_counts    frequencies  token occurrences in all text (Counter object)
     
@@ -180,7 +187,7 @@ class Session(object):
         r = requests.post(LOGIN_URL, params=params, headers=HEADERS)
         self.cookies = r.cookies
         
-    def search(self, count=1000, matchorder='MATCH', locid=0, distance=settings.DISTANCE, 
+    def search(self, count=1000, matchorder='MATCH', location=None, distance=settings.DISTANCE, 
                min_age=settings.MIN_AGE, max_age=settings.MAX_AGE, gender='all', orientation='all',
                time='year'):
         """Make a search GET request to OKC API. Note: POST does not work.
@@ -232,6 +239,12 @@ class Session(object):
         # omit this param.
         orientation = 4095
         status = 0
+        
+        # location
+        if location is None:
+            locid = 0
+        else:
+            locid = LOCATIONS[location]
         
         # the filter names (eg 'filter1, 'filter2') are not relevant,
         # just indicate the nth filter applied. The value of the
@@ -300,7 +313,7 @@ class Session(object):
             time.sleep(settings.SLEEP_TIME)
 
     def find_and_visit_profiles(self, cutoff=None, threshold=None, **kwargs):
-        """Perform a search for users and then visit their profiles.
+        """Perform a custom search for users and then visit their profiles.
 
         threshold argument:  minimum match percentage score to stop at.
         cuttoff argument:    number of profiles to stop at.

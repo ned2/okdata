@@ -42,25 +42,18 @@ class L1LinearSVC(LinearSVC):
 
 
 CLASSIFIERS = {
-    'nb'         : MultinomialNB(),
-    'bnb'        : BernoulliNB(),
+    'l1svc'      : L1LinearSVC()
     'ridge'      : RidgeClassifier(tol=1e-2, solver="lsqr"),
     'perceptron' : Perceptron(n_iter=50, alpha=0.1, penalty=None),
     'pa'         : PassiveAggressiveClassifier(n_iter=50),
-    'sgd'        : SGDClassifier(loss='log', alpha=0.1, penalty='l2', n_iter=5),
-    'knn'        : KNeighborsClassifier(n_neighbors=10), 
-    'nc'         : NearestCentroid(),
     'svc'        : LinearSVC(loss='l2', penalty='l1',
                              dual=False, tol=1e-3),
-    'l1svc'      : L1LinearSVC()
+    #'nb'         : MultinomialNB(),
+    #'bnb'        : BernoulliNB(),
+    #'nc'         : NearestCentroid(),
+    #'sgd'        : SGDClassifier(loss='log', alpha=0.1, penalty='l2', n_iter=5),
+    #'knn'        : KNeighborsClassifier(n_neighbors=10), 
 }            
-
-
-def test_all(users):
-    for classifier_type in CLASSIFIERS:
-        print classifier_type
-        RunTrainTest(users, classifier_type=classifier_type, grid_search=True)
-        print '\n'
 
 
 class RunTrainTest(object):
@@ -119,58 +112,28 @@ class RunTrainTest(object):
         return labels
                 
     def get_cls(self, classifier_type, tfidf, n_features):
-        # strip_accents doesn't seem to affect things for either
-        # binary=True pulls down the recall of matches for nb but
-        # increases average f-score does not affect bnb (obviously)
-        # and destroys precision and recall for SGD.
-        #
-        # stopping has no effect on nb and bnb but kills matches
-        # recall for SGD.
-        #
-        # strip_accents seems to have no noticable effect.
-
-        # TODO: work out if removing short profiles improves things
-
         if classifier_type == 'nb':
             count_vect = CountVectorizer(
-                analyzer='word',
-                ngram_range=(1,3), 
+                analyzer='char',
+                ngram_range=(1,2), 
                 stop_words=None, 
                 binary=False, 
                 strip_accents='unicode',
             )
         elif classifier_type == 'bnb':
             count_vect = CountVectorizer(
-                analyzer='char',
+                analyzer='char_wb',
                 ngram_range=(1,3), 
                 stop_words=None, 
                 binary=False, 
                 strip_accents='unicode',
             )
-        elif classifier_type == 'nc':
-            count_vect = CountVectorizer(
-                analyzer='word',   # also works slightly better with 'char'
-                ngram_range=(1,1), 
-                stop_words=None, 
-                binary=False, 
-                strip_accents='unicode',
-            )
-        elif classifier_type == 'perceptron':
+        else: 
             count_vect = CountVectorizer(
                 analyzer='word',
                 ngram_range=(1,3), 
                 stop_words=None, 
                 binary=False,
-                #token_pattern='\w+',
-                strip_accents='unicode',
-            )
-        else: #'sgd' and defaults for others 
-            count_vect = CountVectorizer(
-                analyzer='word',
-                ngram_range=(1,2), 
-                stop_words=None, 
-                binary=False,
-                #token_pattern='\w+',
                 strip_accents='unicode',
             )
 
@@ -186,14 +149,14 @@ class RunTrainTest(object):
 
     def grid_search(self, classifier, grid_score, tfidf, n_features):
         param_grid = {
-            #'vect__analyzer'      : ('word', 'char', 'char_wb'),
-            #'vect__ngram_range'   : ((1, 1), (1, 2), (1,3)),
-            #'vect__stop_words'    : ('english', None),
-            #'vect__strip_accents' : ('unicode', None),
+            'vect__analyzer'      : ('word', 'char', 'char_wb'),
+            'vect__ngram_range'   : ((1, 1), (1, 2), (1,3)),
+            'vect__stop_words'    : ('english', None),
+            'vect__strip_accents' : ('unicode', None),
             #'vect__binary'        : (True, False),
             #'clf__loss'           : ('hinge','perceptron', 'huber', 'log', 'modified_huber'),
-            'clf__alpha'          : (1e-1, 1e-2, 1e-3, 1e-4),
-            'clf__penalty'        : ('l1', 'l2', None),
+            #'clf__alpha'          : (1e-1, 1e-2, 1e-3, 1e-4),
+            #'clf__penalty'        : ('l1', 'l2', None),
         }
 
         if n_features is not None:
@@ -227,6 +190,14 @@ class RunTrainTest(object):
         return self.classifier.steps[0][1].get_feature_names()
 
     
+def test_all(users, grid_search=False, tfidf=False):
+    for classifier_type in CLASSIFIERS:
+        print classifier_type
+        RunTrainTest(users, tfidf=tfidf, classifier_type=classifier_type,
+                     grid_search=grid_search)
+        print '\n'
+
+
 def main():
     args = argparser().parse_args()
     users = okc.load_users(args.path)
