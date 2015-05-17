@@ -4,6 +4,7 @@ from __future__ import division
 
 import sys
 import argparse
+import numpy
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB, BernoulliNB
@@ -23,6 +24,8 @@ import okc
 def argparser():
     argparser = argparse.ArgumentParser()
     argparser.add_argument("path")
+    argparser.add_argument("--classifier", default='pa')
+    argparser.add_argument("--topfeatures", default=None)
     return argparser
 
      
@@ -42,7 +45,7 @@ class L1LinearSVC(LinearSVC):
 
 
 CLASSIFIERS = {
-    'l1svc'      : L1LinearSVC()
+    'l1svc'      : L1LinearSVC(),
     'ridge'      : RidgeClassifier(tol=1e-2, solver="lsqr"),
     'perceptron' : Perceptron(n_iter=50, alpha=0.1, penalty=None),
     'pa'         : PassiveAggressiveClassifier(n_iter=50),
@@ -65,8 +68,6 @@ class RunTrainTest(object):
     can be more stable
 
     To do next:
-      * inspect most informative features
-        http://stackoverflow.com/questions/11116697/how-to-get-most-informative-features-for-scikit-learn-classifiers
       * look at most informative features when analyzer='char'
       * investigate how to add other features in, such as size of essay, age, etc.<
     """
@@ -75,11 +76,12 @@ class RunTrainTest(object):
     test_proportion = 0.2
 
     def __init__(self, users, label_type='match', match_threshold=70, 
-                 classifier_type='nb', tfidf=False, grid_search=False,
+                 classifier_type='pa', tfidf=True, grid_search=False,
                  grid_score='f1', n_features=None):
         self.label_type = label_type
         self.match_threshold = match_threshold
         self.set_data(users)
+
         classifier = self.get_cls(classifier_type, tfidf, n_features)
 
         if grid_search:
@@ -106,7 +108,7 @@ class RunTrainTest(object):
         labels = []
         for user in users:
             if self.label_type == 'gender':
-                labels.append(user.data['gender'])
+                labels.append(user.gender)
             else:
                 labels.append(int(user.match >= self.match_threshold))
         return labels
@@ -138,6 +140,7 @@ class RunTrainTest(object):
             )
 
         pipeline = [('vect', count_vect)]
+
         if n_features is not None:
             pipeline.append(('feat_sel', SelectKBest(chi2, k=n_features)))
 
@@ -176,10 +179,10 @@ class RunTrainTest(object):
         print metrics.confusion_matrix(self.test_labels, predicted)
 
     def show_most_informative_features(self, n=50):
-        coefs_with_fns = sorted(zip(self.coefficients, self.features))
+        coefs_with_fns = sorted(zip(self.coefficients, self.features, self.feature_values))
         top = zip(coefs_with_fns[:n], coefs_with_fns[:-(n + 1):-1])
-        for (coef_1, fn_1), (coef_2, fn_2) in top:
-            print "\t%.4f\t%-15s\t\t%.4f\t%-15s" % (coef_1, fn_1, coef_2, fn_2)
+        for (coef_1, fn_1, freq_1), (coef_2, fn_2, freq_2) in top:
+            print "{:10.4f}{:>20}{:10}   |{:10.4f}{:>20}{:10}".format(coef_1, fn_1, freq_1, coef_2, fn_2, freq_2)
 
     @property
     def coefficients(self):
@@ -188,9 +191,14 @@ class RunTrainTest(object):
     @property
     def features(self):
         return self.classifier.steps[0][1].get_feature_names()
+    
+    @property
+    def feature_values(self):
+        matrix = self.classifier.steps[0][1].fit_transform(self.train_data)
+        return matrix.sum(axis=0).tolist()[0]
 
     
-def test_all(users, grid_search=False, tfidf=False):
+def test_all(users, grid_search=False):
     for classifier_type in CLASSIFIERS:
         print classifier_type
         RunTrainTest(users, tfidf=tfidf, classifier_type=classifier_type,
@@ -201,9 +209,12 @@ def test_all(users, grid_search=False, tfidf=False):
 def main():
     args = argparser().parse_args()
     users = okc.load_users(args.path)
-    run = RunTrainTest(users, label_type='match')
+    run = RunTrainTest(users, label_type='match', classifier_type='pa')
 
-    
+    if args.topfeatures:
+        run.show_most_informative_features(int(args.topfeatures))
+
+        
 if __name__ == "__main__":
     sys.exit(main())
 

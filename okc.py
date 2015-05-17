@@ -62,7 +62,6 @@ class User(object):
 
     Class attributes:
 
-    json_data       copy of profile converted from JSON (dict)
     username        username (string)
     age             age (int)
     gender          gender (string)
@@ -86,15 +85,14 @@ class User(object):
         if 'matchpercentage' not in data:
             raise OkcIncompleteProfileError(data['username'])
 
-        self.json_data = data
         self.username = data['username']
         self.age = int(data['age'])
         self.gender = int(data['gender'])
         self.match = data['matchpercentage']
         self.enemy = data['enemypercentage']
-        self.process_essays()
+        self.process_essays(data['essays'])
         
-    def process_essays(self):
+    def process_essays(self, essays):
         """Move essays from data object into two lists: a list of essay titles
         and a list of corresponding essay contents. Also massage the
         essay contents to have sensible newlines.
@@ -102,7 +100,7 @@ class User(object):
         """
         self.essays = []
         self.essay_titles = []
-        for essay in self.json_data['essays']:
+        for essay in essays:
             self.essay_titles.append(essay['title'])
             this_essay = essay['essay']
             if this_essay == []:
@@ -115,11 +113,6 @@ class User(object):
                 text = re.sub(r'\n(?=[^\n])', ' ', text)
                 self.essays.append(text)
 
-        # do post processing on essay text
-        tokens = self.tokens
-        self.num_tokens = len(tokens)
-        self.token_counts = Counter(tokens)
-        
     @property
     def text(self):
         """Returns the complete text from all essays in a user's profile"""
@@ -129,13 +122,6 @@ class User(object):
     def tokens(self):
         """Returns a list of tokens from all essays."""
         return re.split('\W+', self.text.lower())
-    
-    @property    
-    def data(self):
-        """Returns the user's profile data possibly with extra goodies."""
-        extra = {'num_tokens' : self.num_tokens}
-        self.json_data.update(extra)
-        return self.json_data
     
     def __unicode__(self):
         return self.username
@@ -291,9 +277,9 @@ class Session(object):
                     file.write(json_string)
                 print u"{}: Wrote {}".format(count+1, username)
             except OkcNoSuchUserError as error:
-                print "NO SUCH USER: {}".format(username)
+                print u"NO SUCH USER: {}".format(username)
             except requests.ConnectionError as error:
-                print "CONNECTION ERROR: {}".format(username)
+                print u"CONNECTION ERROR: {}".format(username)
             time.sleep(settings.SLEEP_TIME)
 
     def visit_profiles(self, usernames):
@@ -307,9 +293,9 @@ class Session(object):
                 user = self.get_profile(username)
                 print u"{}: Visited {}".format(count+1, username)
             except OkcNoSuchUserError as error:
-                print "NO SUCH USER: {}".format(username)
+                print u"NO SUCH USER: {}".format(username)
             except requests.ConnectionError as error:
-                print "CONNECTION ERROR: {}".format(username)
+                print u"CONNECTION ERROR: {}".format(username)
             time.sleep(settings.SLEEP_TIME)
 
     def find_and_visit_profiles(self, cutoff=None, threshold=None, **kwargs):
