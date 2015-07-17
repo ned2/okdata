@@ -134,7 +134,10 @@ def load_user(json_path):
     """Returns a User based on JSON profile file path; None if errors."""
     with open(json_path) as file:
         json_contents = file.read()
-        data = json.loads(json_contents)
+        try:
+            data = json.loads(json_contents)
+        except ValueError as e:
+            return None
     try:
         return User(data)
     except OkcIncompleteProfileError as e:
