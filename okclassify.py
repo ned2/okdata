@@ -21,14 +21,26 @@ from sklearn import metrics
 import okc
 
 
+MATCH_THRESHOLD = 70
+TRAIN_PROPORTION = 0.8
+
+
 def argparser():
     argparser = argparse.ArgumentParser()
     argparser.add_argument("path")
     argparser.add_argument("--classifier", default='pa')
-    argparser.add_argument("--topfeatures", default=None)
+    argparser.add_argument("--punct", action='store_true')
+    argparser.add_argument("--match", default=70, type=int)
+    argparser.add_argument("--topfeatures", default=0, type=int)
     return argparser
 
-     
+
+text_func = lambda user : user.text
+match_func = lambda user : int(user.match >= MATCH_THRESHOLD)
+gender_func = lambda user : user.gender
+
+
+
 class L1LinearSVC(LinearSVC):
 
     def fit(self, X, y):
@@ -59,7 +71,7 @@ CLASSIFIERS = {
 }            
 
 
-class RunTrainTest(object):
+class Classifier(object):
     """Why does using the TfidfTransformer make the results for successful
     identification go to zero for match_threshold > 60 or so?
 
@@ -72,70 +84,35 @@ class RunTrainTest(object):
       * investigate how to add other features in, such as size of essay, age, etc.<
     """
     
-    train_proportion = 0.8
-    test_proportion = 0.2
-
-    def __init__(self, users, label_type='match', match_threshold=70, 
-                 classifier_type='pa', tfidf=True, grid_search=False,
-                 grid_score='f1', n_features=None):
-        self.label_type = label_type
-        self.match_threshold = match_threshold
-        self.set_data(users)
-
-        classifier = self.get_cls(classifier_type, tfidf, n_features)
+    def __init__(self, instances, labels, class_type='pa', tfidf=True,
+                 grid_search=False, n_features=None):
+        classifier = self.get_cls(class_type, tfidf, n_features)
 
         if grid_search:
-            classifier = self.grid_search(classifier, grid_score, tfidf,
-                                          n_features)
+            classifier = self.grid_search(classifier, tfidf, n_features)
         
-        self.classifier = classifier.fit(self.train_data, self.train_labels)
-        self.test()
+        self.classifier = classifier.fit(instances, labels)
 
         if grid_search:
             print self.classifier.best_params_
-
             
-    def set_data(self, users):
-        self.train_users, self.test_users = train_test_split(
-            users, train_size=self.train_proportion, random_state=42)
-
-        self.train_data = [user.text for user in self.train_users]
-        self.test_data = [user.text for user in self.test_users]
-        self.train_labels = self.labels(self.train_users)
-        self.test_labels = self.labels(self.test_users)
-        
-    def labels(self, users):
-        labels = []
-        for user in users:
-            if self.label_type == 'gender':
-                labels.append(user.gender)
-            else:
-                labels.append(int(user.match >= self.match_threshold))
-        return labels
-                
     def get_cls(self, classifier_type, tfidf, n_features):
         if classifier_type == 'nb':
             count_vect = CountVectorizer(
                 analyzer='char',
                 ngram_range=(1,2), 
-                stop_words=None, 
-                binary=False, 
                 strip_accents='unicode',
             )
         elif classifier_type == 'bnb':
             count_vect = CountVectorizer(
                 analyzer='char_wb',
                 ngram_range=(1,3), 
-                stop_words=None, 
-                binary=False, 
                 strip_accents='unicode',
             )
         else: 
             count_vect = CountVectorizer(
                 analyzer='word',
                 ngram_range=(1,3), 
-                stop_words=None, 
-                binary=False,
                 strip_accents='unicode',
             )
 
@@ -173,16 +150,23 @@ class RunTrainTest(object):
         classifier = GridSearchCV(classifier, param_grid, scoring=grid_score)
         return classifier
         
-    def test(self):
-        predicted = self.classifier.predict(self.test_data)
-        print metrics.classification_report(self.test_labels, predicted)
-        print metrics.confusion_matrix(self.test_labels, predicted)
+    def test(self, instances, labels):
+        predicted = self.classifier.predict(instances)
+        print metrics.classification_report(labels, predicted)
+        print metrics.confusion_matrix(labels, predicted)
 
-    def show_most_informative_features(self, n=50):
-        coefs_with_fns = sorted(zip(self.coefficients, self.features, self.feature_values))
-        top = zip(coefs_with_fns[:n], coefs_with_fns[:-(n + 1):-1])
+    def show_most_informative_features(self, instances, topn):
+        coefs_with_fns = sorted(zip(self.coefficients, self.features, self.feature_values(instances)))
+        top = zip(coefs_with_fns[:topn], coefs_with_fns[:-(topn + 1):-1])
         for (coef_1, fn_1, freq_1), (coef_2, fn_2, freq_2) in top:
+            fn_1 = okc.decode_punct(fn_1)
+            fn_2 = okc.decode_punct(fn_2)
             print "{:10.4f}{:>20}{:10}   |{:10.4f}{:>20}{:10}".format(coef_1, fn_1, freq_1, coef_2, fn_2, freq_2)
+
+    def feature_values(self, instances):
+        """So we can get the raw counts of the features as used by the classifier."""
+        matrix = self.classifier.steps[0][1].fit_transform(instances)
+        return matrix.sum(axis=0).tolist()[0]
 
     @property
     def coefficients(self):
@@ -192,12 +176,9 @@ class RunTrainTest(object):
     def features(self):
         return self.classifier.steps[0][1].get_feature_names()
     
-    @property
-    def feature_values(self):
-        matrix = self.classifier.steps[0][1].fit_transform(self.train_data)
-        return matrix.sum(axis=0).tolist()[0]
 
     
+#TODO update this
 def test_all(users, grid_search=False):
     for classifier_type in CLASSIFIERS:
         print classifier_type
@@ -206,16 +187,31 @@ def test_all(users, grid_search=False):
         print '\n'
 
 
-def main():
-    args = argparser().parse_args()
-    users = okc.load_users(args.path)
-    run = RunTrainTest(users, label_type='match', classifier_type='pa')
+def train_test(users, class_type, topfeatures):
+    train_users, test_users = train_test_split(
+        users, train_size=TRAIN_PROPORTION, random_state=42
+    )
+    train_instances = (text_func(u) for u in train_users)
+    train_labels = [match_func(u) for u in train_users]
+    test_instances = (text_func(u) for u in test_users)
+    test_labels = [match_func(u) for u in test_users]
+    cls = Classifier(train_instances, train_labels, class_type)
+    cls.test(test_instances, test_labels)
 
-    if args.topfeatures:
-        run.show_most_informative_features(int(args.topfeatures))
+    if topfeatures:
+        train_instances = (text_func(u) for u in train_users)
+        cls.show_most_informative_features(train_instances, topfeatures)
+
+    return cls
+
+
+def main():
+    global MATCH_THRESHOLD
+    args = argparser().parse_args()
+    MATCH_THRESHOLD = args.match
+    users = okc.load_users(args.path, keep_punct=args.punct)
+    classifier = train_test(users, args.classifier, args.topfeatures)
 
         
 if __name__ == "__main__":
     sys.exit(main())
-
-    

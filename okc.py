@@ -41,6 +41,53 @@ MATCH_ORDERS = (
 )
 
 
+PUNCT_MAPPINGS = {
+    ',' : 'punctcomma',
+    '.' : 'punctperiod',
+    '_' : 'punctunderscore',
+    '\\' : 'punctbslash',
+    '/' : 'punctslash',
+    '?' : 'punctquestion',
+    ':' : 'punctcolon',
+    ';' : 'punctscolon',
+    '!' : 'punctexclamation',
+    '@' : 'punctat',
+    '#' : 'puncthash',
+    '$' : 'punctdollar',
+    '%' : 'punctpercent',    
+    '"' : 'punctdquote',    
+    "'" : 'punctsquote',
+    '(' : 'punctlparen',
+    ')' : 'punctrparen',
+    '*' : 'punctstar',
+    '%' : 'punctampersand',
+    '^' : 'punctcarrot',
+    '<' : 'punctlarrow',
+    '>' : 'punctrarrow',
+    '{' : 'punctlbrace',
+    '}' : 'punctrbrace',
+    '~' : 'puncttilde',
+    '_' : 'punctunderscore',
+}
+
+MAPPINGS_PUNCT = {val:key for key,val in PUNCT_MAPPINGS.items()}
+
+
+def encode_punct(text):
+    return repl_mappings(PUNCT_MAPPINGS, text)
+
+
+def decode_punct(text):
+    return repl_mappings(MAPPINGS_PUNCT, text)
+
+
+def repl_mappings(mappings_dict, text):
+    regex = '|'.join(re.escape(char) for char in mappings_dict)
+    regex = '({})'.format(regex)
+    repl_func = lambda m:' {} '.format(mappings_dict[m.string[m.start():m.end()]])
+    return re.sub(regex, repl_func, text)
+
+
 class OkcError(Exception):
     pass
 
@@ -57,9 +104,6 @@ class OkcIncompleteProfileError(OkcError):
 class User(object):
     """Models an OKC user profile.
 
-    The JSON data representing a profile is stored with some
-    attributes being pulled out explicitly to be used.
-
     Class attributes:
 
     username        username (string)
@@ -71,8 +115,6 @@ class User(object):
     essays          list of essay contents (strings)
     text            combined text from all essays (string)
     tokens
-    num_tokens      number of tokens used in all essays (int)
-    token_counts    frequencies  token occurrences in all text (Counter object)
     
     The nth item in essay_titles is the title of the essay in the nth
     position in essays list. A value of None in the essays list
@@ -80,11 +122,12 @@ class User(object):
 
     """
     
-    def __init__(self, data):
+    def __init__(self, data, keep_punct=False):
         """data param = dict"""
         if 'matchpercentage' not in data:
             raise OkcIncompleteProfileError(data['username'])
 
+        self.keep_punct = keep_punct
         self.username = data['username']
         self.age = int(data['age'])
         self.gender = int(data['gender'])
@@ -116,7 +159,11 @@ class User(object):
     @property
     def text(self):
         """Returns the complete text from all essays in a user's profile"""
-        return '\n'.join(essay for essay in self.essays if essay is not None)
+        text = '\n'.join(essay for essay in self.essays if essay is not None)
+
+        if self.keep_punct:
+            text = encode_punct(text)
+        return text
 
     @property
     def tokens(self):
@@ -130,23 +177,23 @@ class User(object):
         return self.username.encode('utf8')
 
 
-def load_user(json_path):
+def load_user(json_path, *args, **kwargs):
     """Returns a User based on JSON profile file path; None if errors."""
     with open(json_path) as file:
         json_contents = file.read()
         data = json.loads(json_contents)
     try:
-        return User(data)
+        return User(data, *args, **kwargs)
     except OkcIncompleteProfileError as e:
         print e
         return None
 
 
-def load_users(path):
+def load_users(path, *args, **kwargs):
     """Return a list of User objects from a directory of JSON profiles.""" 
     users = []
     for item in os.listdir(path):
-        user = load_user(os.path.join(path, item))
+        user = load_user(os.path.join(path, item), *args, **kwargs)
         if user is not None:
             users.append(user)
     return users
