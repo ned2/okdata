@@ -8,6 +8,9 @@ import numpy
 from sklearn import linear_model
 from sklearn import metrics
 from sklearn.cross_validation import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.pipeline import Pipeline
 
 import okc
 
@@ -30,7 +33,7 @@ def argparser():
 class Regressor(object):
 
     def __init__(self, instances, labels, regressor_type, tfidf=True):
-        regressor = self.get_regressor(regressor_type, tfidf, n_features)
+        regressor = self.get_regressor(regressor_type, tfidf)
         self.regressor = regressor.fit(instances, labels)
         
         
@@ -54,7 +57,7 @@ class Regressor(object):
 
         
 text_func = lambda user : user.text
-match_func = lambda user : int(user.match >= MATCH_THRESHOLD)
+match_func = lambda user : float(user.match)
 
 
 def train_test(users, regressor_type):
