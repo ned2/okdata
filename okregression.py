@@ -15,7 +15,7 @@ TRAIN_PROPORTION = 0.8
 
 REGRESSORS = {
     'linear'      : linear_model.LinearRegression(),
-    'ridge'       : inear_model.Ridge(alpha=.5),
+    'ridge'       : linear_model.Ridge(alpha=.5),
 }
 
 
@@ -28,7 +28,7 @@ def argparser():
 
 class Regressor(object):
 
-    def __init__(self, instances, labels, regressor_type = tfidf=True):
+    def __init__(self, instances, labels, regressor_type, tfidf=True):
         regressor = self.get_regressor(regressor_type, tfidf, n_features)
         self.regressor = regressor.fit(instances, labels)
         
@@ -41,11 +41,11 @@ class Regressor(object):
         )
         pipeline = [('vect', count_vect)]
 
-    if tfidf:
-        pipeline.append(('tfidf', TfidfTransformer()))
+        if tfidf:
+            pipeline.append(('tfidf', TfidfTransformer()))
 
-    pipeline.append(('regressor', REGRESSORS[regressor_type]))
-    return Pipeline(pipeline)
+        pipeline.append(('regressor', REGRESSORS[regressor_type]))
+        return Pipeline(pipeline)
 
     def test(self, instances, labels):
         predicted = self.regressor.predict(instances)
@@ -69,6 +69,7 @@ def train_test(users, regressor_type):
 
 
 def main():
+    args = argparser().parse_args()
     users = okc.load_users(args.path, keep_punct=True)
     train_test(users, args.regressor)
 
