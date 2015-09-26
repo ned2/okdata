@@ -1,0 +1,40 @@
+* okc.py
+** Session class for scraping
+** User class
+Extracts features from the user profile. Currently the text that is
+fed into the classifier is the concatenation of all the user's essays.
+*** preprocessing
+Text is downcased
+
+First of all stripped punctuation, but later on experimented with
+keeping and found it didn't improve the situation much.
+
+Tokenisation is done on words.
+** ML stuff
+*** splitting users into positive/negative
+Started with 70% match as threshold for positive matches as 80% seemed
+like a good number subjectively, but performance was pretty poor so
+dialled it back down.
+
+Suggestion: Use the mean match score as the threshold.
+*** Problem of noisy match scores
+Match score with a user has lower confidence when the user has
+answered fewer questions. Need to modify scraper to get the number of
+questions answered and then filter out users with low number of
+questions answered. Possibly starting with < 100 questions answered.
+*** data size
+If we're running out of data after filtering or for whatever other reason
+we could always scrape more US/European cities, either running
+over larger cities, or combining into one big corpus.
+*** impact of gender on classification/regression results
+Does running over single genders impact the results?
+*** further problems:
+**** regression over match scores
+**** predicting gender (classification)
+**** comparing performance over different cities
+**** looking at similarity 
+(eg of token distributions) between different cities
+* misc infrastructure stuff
+** TODO Implement experiment management/logging setup
+Maybe use sCons
+** TODO implement lazy streaming of Users into classifier/regression model
