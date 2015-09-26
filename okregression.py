@@ -7,6 +7,7 @@ import argparse
 import numpy
 from sklearn import linear_model
 from sklearn import metrics
+from sklearn.cross_validation import train_test_split
 
 import okc
 
