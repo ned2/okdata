@@ -131,20 +131,13 @@ class User(object):
         self.username = data['username']
         self.age = int(data['age'])
         self.gender = int(data['gender'])
-        self.match = data['matchpercentage']
-        self.enemy = data['enemypercentage']
+        self.match = int(data['matchpercentage'])
+        self.enemy = int(data['enemypercentage'])
         self.process_essays(data['essays'])
         
     def process_essays(self, essays):
-        """Move essays from data object into two lists: a list of essay titles
-        and a list of corresponding essay contents. Also massage the
-        essay contents to have sensible newlines.
-
-        """
         self.essays = []
-        self.essay_titles = []
         for essay in essays:
-            self.essay_titles.append(essay['title'])
             this_essay = essay['essay']
             if this_essay == []:
                 # User did not fill this essay out
@@ -177,29 +170,33 @@ class User(object):
         return self.username.encode('utf8')
 
 
-def load_user(json_path, *args, **kwargs):
+def load_user(json_path, func=None, **user_kwargs):
     """Returns a User based on JSON profile file path; None if errors."""
     with open(json_path) as file:
         json_contents = file.read()
-        try:
-            data = json.loads(json_contents)
-        except ValueError as e:
-            return None
+
     try:
-        return User(data, *args, **kwargs)
+        data = json.loads(json_contents)
+    except ValueError as e:
+        return None
+
+    try:
+        user = User(data, user_kwargs)
+        if func is None:
+            return user
+        else:
+            return func(user)
     except OkcIncompleteProfileError as e:
         print e
         return None
 
 
-def load_users(path, *args, **kwargs):
+def load_users(paths, func=None, **user_kwargs):
     """Return a list of User objects from a directory of JSON profiles.""" 
-    users = []
-    for item in os.listdir(path):
-        user = load_user(os.path.join(path, item), *args, **kwargs)
+    for path in paths:
+        user = load_user(path, func=func, **user_kwargs)
         if user is not None:
-            users.append(user)
-    return users
+            yield user
 
 
 class Session(object):

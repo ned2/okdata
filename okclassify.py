@@ -3,8 +3,8 @@
 from __future__ import division
 
 import sys
+import os
 import argparse
-import numpy
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB, BernoulliNB
@@ -187,16 +187,18 @@ def test_all(users, grid_search=False):
         print '\n'
 
 
-def train_test(users, class_type, topfeatures):
-    train_users, test_users = train_test_split(
-        users, train_size=TRAIN_PROPORTION, random_state=42
+def train_test(user_paths, class_type, topfeatures):
+    train_user_paths, test_user_paths = train_test_split(
+        user_paths, train_size=TRAIN_PROPORTION, random_state=42
     )
-    train_instances = (text_func(u) for u in train_users)
-    train_labels = [match_func(u) for u in train_users]
-    test_instances = (text_func(u) for u in test_users)
-    test_labels = [match_func(u) for u in test_users]
-    cls = Classifier(train_instances, train_labels, class_type)
-    cls.test(test_instances, test_labels)
+    train_instances = okc.load_users(train_user_paths, func=text_func)
+    train_labels = okc.load_users(train_user_paths, func=match_func)
+
+    test_instances = okc.load_users(test_user_paths, func=text_func)
+    test_labels = okc.load_users(test_user_paths, func=match_func)
+
+    cls = Classifier(train_instances, list(train_labels), class_type)
+    cls.test(test_instances, list(test_labels))
 
     if topfeatures:
         train_instances = (text_func(u) for u in train_users)
@@ -209,8 +211,8 @@ def main():
     global MATCH_THRESHOLD
     args = argparser().parse_args()
     MATCH_THRESHOLD = args.match
-    users = okc.load_users(args.path, keep_punct=args.punct)
-    classifier = train_test(users, args.classifier, args.topfeatures)
+    paths = [os.path.join(args.path, p) for p in os.listdir(args.path)]
+    classifier = train_test(paths, args.classifier, args.topfeatures)
 
         
 if __name__ == "__main__":
