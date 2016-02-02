@@ -31,6 +31,7 @@ def argparser():
     argparser.add_argument("--classifier", default='pa')
     argparser.add_argument("--punct", action='store_true')
     argparser.add_argument("--match", default=70, type=int)
+    argparser.add_argument("--questions", default=None, type=int)
     argparser.add_argument("--topfeatures", default=0, type=int)
     return argparser
 
@@ -211,7 +212,16 @@ def main():
     global MATCH_THRESHOLD
     args = argparser().parse_args()
     MATCH_THRESHOLD = args.match
-    paths = [os.path.join(args.path, p) for p in os.listdir(args.path)]
+
+    paths = okc.get_user_paths(args.path)
+
+    print "{} profile paths in {}".format(len(paths), args.path) 
+
+    if args.questions is not None:
+        paths = okc.filter_users(paths, args.questions)
+        print "{} paths after filtering".format(len(paths))
+
+    print    
     classifier = train_test(paths, args.classifier, args.topfeatures)
 
         

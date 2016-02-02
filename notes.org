@@ -37,4 +37,3 @@ Does running over single genders impact the results?
 * misc infrastructure stuff
 ** TODO Implement experiment management/logging setup
 Maybe use sCons
-** TODO implement lazy streaming of Users into classifier/regression model
