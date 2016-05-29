@@ -1,11 +1,14 @@
-from __future__ import division
-
 import json
 import glob
 import time
 import re
 import os
+
 from collections import Counter
+from itertools import chain
+
+from nltk.tokenize import word_tokenize
+
 
 import requests
 import settings
@@ -44,123 +47,54 @@ MATCH_ORDERS = (
 )
 
 
-PUNCT_MAPPINGS = {
-    ',' : 'punctcomma',
-    '.' : 'punctperiod',
-    '_' : 'punctunderscore',
-    '\\' : 'punctbslash',
-    '/' : 'punctslash',
-    '?' : 'punctquestion',
-    ':' : 'punctcolon',
-    ';' : 'punctscolon',
-    '!' : 'punctexclamation',
-    '@' : 'punctat',
-    '#' : 'puncthash',
-    '$' : 'punctdollar',
-    '%' : 'punctpercent',    
-    '"' : 'punctdquote',    
-    "'" : 'punctsquote',
-    '(' : 'punctlparen',
-    ')' : 'punctrparen',
-    '*' : 'punctstar',
-    '%' : 'punctampersand',
-    '^' : 'punctcarrot',
-    '<' : 'punctlarrow',
-    '>' : 'punctrarrow',
-    '{' : 'punctlbrace',
-    '}' : 'punctrbrace',
-    '~' : 'puncttilde',
-    '_' : 'punctunderscore',
-}
-
-MAPPINGS_PUNCT = {val:key for key,val in PUNCT_MAPPINGS.items()}
-
-
-def encode_punct(text):
-    return repl_mappings(PUNCT_MAPPINGS, text)
-
-
-def decode_punct(text):
-    return repl_mappings(MAPPINGS_PUNCT, text)
-
-
-def repl_mappings(mappings_dict, text):
-    regex = '|'.join(re.escape(char) for char in mappings_dict)
-    regex = '({})'.format(regex)
-    repl_func = lambda m:' {} '.format(mappings_dict[m.string[m.start():m.end()]])
-    return re.sub(regex, repl_func, text)
-
-
-def load_user(json_path, func=None, **user_kwargs):
-    """Returns a User based on JSON profile file path; None if errors."""
-    with open(json_path) as file:
-        json_contents = file.read()
-
-    try:
-        data = json.loads(json_contents)
-    except ValueError as e:
-        return None
-
-    try:
-        user = User(data, user_kwargs)
-    except OkcIncompleteProfileError as e:
-        print e
-        return None
-
-    if func is None:
-        return user
-    else:
-        return func(user)
-
-
-# probably need to push the filtering to before the load_users function
-# since the train_test split is calculated before this function is invoked
-
-def load_users(paths, func=None, question_min=None, **user_kwargs):
-    """Return a list of User objects from a directory of JSON profiles.""" 
-    for path in paths:
-        user = load_user(path, func=func, **user_kwargs)
-        
-        if user is not None:
-            yield user
-
-            
-def filter_users(paths, question_min):
-    # skip over users with fewer than min questions answered
-    filtered_paths = []
-    user_data = get_user_data(os.path.split(paths[0])[0])
-
-    for user_path in paths:
-        username = os.path.splitext(os.path.basename(user_path))[0].decode('utf8')
-        try:
-            data = user_data[username] 
-        except KeyError as e:
-            print "user {} missing from user data dictionary".format(username)
-        
-        if data['num_questions'] >= question_min:
-            filtered_paths.append(user_path)
-
-    return filtered_paths
-
-    
 def get_user_paths(path):
+    """Returns an iterator with all sub-paths paths corresponding to *.json"""
     return glob.glob(os.path.join(path, '*.json'))
 
 
-def get_user_data(path):
-    user_data_path = os.path.join(path, USER_DATA_FILE)
+def load_user(json_path):
+    """Returns a User based on JSON profile file path"""
+    with open(json_path, encoding='utf-8') as file:
+        json_contents = file.read()
+        data = json.loads(json_contents)
+        return User(data)
 
-    if not os.path.exists(user_data_path):
-        return {}
 
-    with open(user_data_path) as f:
-        return json.loads(f.read())
+def load_users(collection_path):
+    """Return an iterator of User objects from a directory of JSON profiles.""" 
+    for path in get_user_paths(collection_path):
+        try:
+            yield load_user(path)
+        except (ValueError, OkcIncompleteProfileError) as e:
+            print(e)
+            pass
+
+            
+def filter_users(paths, question_min):
+    """Takes a list of user paths and filters out ones with fewer than question_min answered."""
+    filtered_paths = []
+
+    # load the additional user data stored alongside profiles
+    user_data_path = os.path.join(os.path.split(paths[0])[0], USER_DATA_FILE)
+
+    with open(user_data_path, encoding='utf-8') as f:
+        user_data = json.loads(f.read())
+
+    for user_path in paths:
+        username = os.path.splitext(os.path.basename(user_path))[0]
+
+        if username not in user_data:
+            print("user {} missing from user data dictionary".format(username))
+        else:
+            data = user_data[username] 
+            if data['num_questions'] >= question_min:
+                yield user_path
 
     
 def write_user_data(data, path):
     user_data_path = os.path.join(path, USER_DATA_FILE)
 
-    with open(user_data_path, 'w') as f:
+    with open(user_data_path, 'w', encoding='utf-8') as f:
         f.write(json.dumps(data))
 
         
@@ -181,7 +115,7 @@ class OkcIncompleteProfileError(OkcError):
 class User(object):
     """Models an OKC user profile.
 
-    Class attributes:
+    Instance attributes:
 
     username        username (string)
     age             age (int)
@@ -199,52 +133,43 @@ class User(object):
 
     """
     
-    def __init__(self, data, keep_punct=False):
-        """data param = dict"""
+    def __init__(self, data):
+
         if 'matchpercentage' not in data:
             raise OkcIncompleteProfileError(data['username'])
 
-        self.keep_punct = keep_punct
         self.username = data['username']
         self.age = int(data['age'])
         self.gender = int(data['gender'])
         self.match = int(data['matchpercentage'])
         self.enemy = int(data['enemypercentage'])
-        self.process_essays(data['essays'])
+        self.essays = self.process_essays(data)
         
-    def process_essays(self, essays):
-        self.essays = []
-        for essay in essays:
+    def process_essays(self, data):
+        found_essays = []
+        for essay in data['essays']:
             this_essay = essay['essay']
             if this_essay == []:
                 # User did not fill this essay out
-                self.essays.append(None)
+                found_essays.append([])
             else:
-                # Single newlines are are removed and double newlines
-                # are converted into single newlines.
                 text = this_essay[0]['rawtext']
-                text = re.sub(r'\n(?=[^\n])', ' ', text)
-                self.essays.append(text)
-
+                found_essays.append(text)
+        return found_essays
+    
+    def get_tokens(self, tokenize=word_tokenize):
+        """Returns an iterator that yields tokens from all essays"""
+        essay_tokens = (word_tokenize(essay) for essay in self.essays if essay)
+        return chain.from_iterable(essay_tokens)
+    
     @property
     def text(self):
         """Returns the complete text from all essays in a user's profile"""
-        text = '\n'.join(essay for essay in self.essays if essay is not None)
-
-        if self.keep_punct:
-            text = encode_punct(text)
+        text = '\n'.join(essay for essay in self.essays if essay)
         return text
 
-    @property
-    def tokens(self):
-        """Returns a list of tokens from all essays."""
-        return re.split('\W+', self.text.lower())
-    
-    def __unicode__(self):
-        return self.username
-
     def __str__(self):
-        return self.username.encode('utf8')
+        return self.username
 
 
 class Session(object):
@@ -355,7 +280,7 @@ class Session(object):
         url = PROFILE_URL.format(username=username)
         result = requests.get(url, cookies=self.cookies, params=params)
         if result.status_code != requests.codes.ok:
-            message = u"Error getting profile: {}\n{}".format(username, result.text)
+            message = "Error getting profile: {}\n{}".format(username, result.text)
             raise OkcNoSuchUserError(message)
         return result.json()
 
@@ -364,7 +289,7 @@ class Session(object):
         url = QUESTIONS_URL.format(username=username)
         result = requests.get(url, cookies=self.cookies, params=params)
         if result.status_code != requests.codes.ok:
-            message = u"Error getting profile: {}\n{}".format(username, result.text)
+            message = "Error getting profile: {}\n{}".format(username, result.text)
             raise OkcNoSuchUserError(message)
         json_data = result.json()
         num_questions = int(json_data['pagination']['raw']['total_num_results'])
@@ -375,7 +300,7 @@ class Session(object):
         user_data = get_user_data(path)
         try:
             for count, username in enumerate(usernames):
-                outpath = os.path.join(path, u"{}.json".format(username))
+                outpath = os.path.join(path, "{}.json".format(username))
                 if resume and os.path.exists(outpath):
                     continue
                 try:
@@ -384,14 +309,14 @@ class Session(object):
                     if username not in user_data:
                         user_data[username] = {}
                     user_data[username]['num_questions'] = num_questions
-                    with open(outpath, 'w') as file:
-                        json_string = json.dumps(user).encode('utf8')
+                    with open(outpath, 'w', encoding='utf-8') as file:
+                        json_string = json.dumps(user)
                         file.write(json_string)    
-                    print u"{}: Wrote {}".format(count+1, username)
+                    print("{}: Wrote {}".format(count+1, username))
                 except OkcNoSuchUserError as error:
-                    print u"NO SUCH USER: {}".format(username)
+                    print("NO SUCH USER: {}".format(username))
                 except requests.ConnectionError as error:
-                    print u"CONNECTION ERROR: {}".format(username)
+                    print("CONNECTION ERROR: {}".format(username))
                 time.sleep(settings.SLEEP_TIME)
         except:
             write_user_data(user_data, path)
@@ -407,11 +332,11 @@ class Session(object):
         for count, username in enumerate(usernames):
             try:
                 self.get_profile(username)
-                print u"{}: Visited {}".format(count+1, username)
+                print("{}: Visited {}".format(count+1, username))
             except OkcNoSuchUserError as error:
-                print u"NO SUCH USER: {}".format(username)
+                print("NO SUCH USER: {}".format(username))
             except requests.ConnectionError as error:
-                print u"CONNECTION ERROR: {}".format(username)
+                print("CONNECTION ERROR: {}".format(username))
             time.sleep(settings.SLEEP_TIME)
 
     def find_and_visit_profiles(self, cutoff=None, threshold=None, **kwargs):
@@ -450,7 +375,7 @@ class Session(object):
             usernames.update(profile['username'] for profile in profiles)
             num_after = len(usernames)
             num_found = num_after - num_before 
-            print "Found {} new users".format(num_found)
+            print("Found {} new users".format(num_found))
             time.sleep(settings.SLEEP_TIME)
         return usernames
 
@@ -485,6 +410,6 @@ class Session(object):
         for min_age, max_age in pairs:
             found = self.find_users(min_age=min_age, max_age=max_age, **kwargs)
             usernames.update(found)
-            print "===================================="
-            print "Found {} users in age bracket {},{}\n".format(len(found), min_age, max_age)
+            print("====================================")
+            print("Found {} users in age bracket {},{}\n".format(len(found), min_age, max_age))
         return usernames
