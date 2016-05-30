@@ -144,6 +144,9 @@ class User(object):
         self.match = int(data['matchpercentage'])
         self.enemy = int(data['enemypercentage'])
         self.essays = self.process_essays(data)
+        self._tokens = None
+        self._words = None
+        self._vocabulary = None
         
     def process_essays(self, data):
         found_essays = []
@@ -160,8 +163,41 @@ class User(object):
     def get_tokens(self, tokenize=word_tokenize):
         """Returns an iterator that yields tokens from all essays"""
         essay_tokens = (word_tokenize(essay) for essay in self.essays if essay)
-        return chain.from_iterable(essay_tokens)
+        self._tokens = list(chain.from_iterable(essay_tokens))
+        return self._tokens
     
+    def get_words(self):
+        self._words = [token.lower() for token in self.tokens if token.isalpha()]
+        return self._words
+        
+    def get_vocabulary(self):
+        self._vocabulary = set(self.words)
+        return self._vocabulary
+        
+    @property
+    def lexical_diversity(self):
+        if len(self.words) == 0:
+            return 0
+        return len(self.vocabulary) / len(self.words)
+
+    @property
+    def vocabulary(self):
+        if self._vocabulary is None:
+            self.get_vocabulary()
+        return self._vocabulary
+        
+    @property
+    def words(self):
+        if self._words is None:
+            self.get_words()
+        return self._words 
+        
+    @property
+    def tokens(self):
+        if self._tokens is None:
+            self.get_tokens()
+        return self._tokens 
+        
     @property
     def text(self):
         """Returns the complete text from all essays in a user's profile"""
