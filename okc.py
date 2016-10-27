@@ -55,9 +55,7 @@ def get_user_paths(path):
 def load_user(json_path):
     """Returns a User based on JSON profile file path"""
     with open(json_path, encoding='utf-8') as file:
-        json_contents = file.read()
-        data = json.loads(json_contents)
-        return User(data)
+        return User(json.loads(file.read()))
 
 
 def load_users(collection_path):
@@ -67,7 +65,16 @@ def load_users(collection_path):
             yield load_user(path)
         except (ValueError, OkcIncompleteProfileError) as e:
             print(e)
-            pass
+
+            
+def load_user_dicts(collection_path):
+    """Return an iterator of user dicts from a directory of JSON profiles.""" 
+    for path in get_user_paths(collection_path):
+        try:
+            with open(path, encoding='utf-8') as file:
+                yield json.loads(file.read())
+        except (ValueError, OkcIncompleteProfileError) as e:
+            print(e)
 
             
 def filter_users(paths, question_min):
@@ -112,6 +119,20 @@ class OkcIncompleteProfileError(OkcError):
         return 'Incomplete profile: {}'.format(self.message)
 
     
+def get_stats(data):
+    if 'matchpercentage' not in data:
+        raise OkcIncompleteProfileError(data['username'])
+   
+    stats = {
+        'username': data['username'],
+        'age': int(data['age']),
+        'gender': int(data['gender']),
+        'match': int(data['matchpercentage']),
+        'enemy': int(data['enemypercentage']),
+    }
+    return stats
+
+
 class User(object):
     """Models an OKC user profile.
 
@@ -135,14 +156,7 @@ class User(object):
     
     def __init__(self, data):
 
-        if 'matchpercentage' not in data:
-            raise OkcIncompleteProfileError(data['username'])
-
-        self.username = data['username']
-        self.age = int(data['age'])
-        self.gender = int(data['gender'])
-        self.match = int(data['matchpercentage'])
-        self.enemy = int(data['enemypercentage'])
+        self.stats = get_stats(data)
         self.essays = self.process_essays(data)
         self._tokens = None
         self._words = None
@@ -162,7 +176,7 @@ class User(object):
     
     def get_tokens(self, tokenize=word_tokenize):
         """Returns an iterator that yields tokens from all essays"""
-        essay_tokens = (word_tokenize(essay) for essay in self.essays if essay)
+        essay_tokens = (tokenize(essay) for essay in self.essays if essay)
         self._tokens = list(chain.from_iterable(essay_tokens))
         return self._tokens
     
