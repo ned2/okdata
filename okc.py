@@ -7,11 +7,12 @@ import os
 from collections import Counter
 from itertools import chain
 
+import requests
+import settings
+
 from nltk.tokenize import word_tokenize
 
 
-import requests
-import settings
 
 
 PROFILE_URL = u'https://www.okcupid.com/profile/{username}'
@@ -102,7 +103,18 @@ def filter_users(paths, question_min):
             if data['num_questions'] >= question_min:
                 yield user_path
 
-    
+
+def get_user_data(path):
+    # TODO: Doesn't actually handle file not existing  
+    user_data_path = os.path.join(path, USER_DATA_FILE)
+
+    if not os.path.exists(user_data_path):
+        return {}
+
+    with open(user_data_path) as f:
+        return json.loads(f.read())
+
+
 def write_user_data(data, path):
     user_data_path = os.path.join(path, USER_DATA_FILE)
 
@@ -369,30 +381,27 @@ class Session(object):
     def dump_profiles(self, usernames, path, resume=False):
         """Retrieves user profiles and write them all to disk."""
         user_data = get_user_data(path)
-        try:
-            for count, username in enumerate(usernames):
-                outpath = os.path.join(path, "{}.json".format(username))
-                if resume and os.path.exists(outpath):
-                    continue
-                try:
-                    user = self.get_profile(username)
-                    num_questions = self.get_num_questions(username)
-                    if username not in user_data:
-                        user_data[username] = {}
-                    user_data[username]['num_questions'] = num_questions
-                    with open(outpath, 'w', encoding='utf-8') as file:
-                        json_string = json.dumps(user)
-                        file.write(json_string)    
-                    print("{}: Wrote {}".format(count+1, username))
-                except OkcNoSuchUserError as error:
-                    print("NO SUCH USER: {}".format(username))
-                except requests.ConnectionError as error:
-                    print("CONNECTION ERROR: {}".format(username))
-                time.sleep(settings.SLEEP_TIME)
-        except:
-            write_user_data(user_data, path)
-            raise
-        self.write_user_data(user_data, path)
+        for count, username in enumerate(usernames):
+            outpath = os.path.join(path, "{}.json".format(username))
+            if resume and os.path.exists(outpath):
+                continue
+            try:
+                user = self.get_profile(username)
+                num_questions = self.get_num_questions(username)
+                if username not in user_data:
+                    user_data[username] = {}
+                user_data[username]['num_questions'] = num_questions
+                with open(outpath, 'w', encoding='utf-8') as file:
+                    json_string = json.dumps(user)
+                    file.write(json_string)
+                write_user_data(user_data, path)
+                print("{}: Wrote {}".format(count+1, username))
+            except OkcNoSuchUserError as error:
+                print("NO SUCH USER: {}".format(username))
+            except requests.ConnectionError as error:
+                print("CONNECTION ERROR: {}".format(username))
+            time.sleep(settings.SLEEP_TIME)
+
 
     def visit_profiles(self, usernames):
         """Retrieves the profiles of a sequence of usernames. Nothing is done

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import os
 import sys
@@ -35,7 +35,7 @@ Instructions for use:
 
 Note that the default settings in settings.py will retrieve hopefully
 almost all users in a 25 m/km radius from you. If you provide your login
-credentials here you can omit them from the commandline.
+credentials here you can omit them from the command line.
 
 If you run the scraper when not in private browsing mode, you'll also
 happen to show up in their visited list. Turns out this is a useful
@@ -86,11 +86,11 @@ def main():
 
     if args.command == 'find':
         usernames = session.find_all_users(location=args.location)
-        with open(args.outpath, 'w') as file:
-            file.write('\n'.join(usernames).encode('utf8'))
+        with open(args.outpath, 'w', encoding='utf8') as file:
+            file.write('\n'.join(usernames))
     elif args.command == 'scrape':
-        with open(args.inpath) as file:
-            usernames = set(file.read().decode('utf').split())
+        with open(args.inpath, encoding='utf8') as file:
+            usernames = set(file.read().split())
         session.dump_profiles(usernames, args.outpath, resume=args.resume)
 
     
