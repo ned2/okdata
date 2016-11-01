@@ -47,6 +47,11 @@ MATCH_ORDERS = (
 )
 
 
+def get_dataframe(path):    
+    users = okc.load_user_dicts(path)  
+    return pd.DataFrame(okc.get_stats(u) for u in users)
+  
+
 def get_user_paths(path):
     """Returns an iterator with all sub-paths paths corresponding to *.json"""
     return glob.glob(os.path.join(path, '*.json'))
@@ -122,14 +127,34 @@ class OkcIncompleteProfileError(OkcError):
 def get_stats(data):
     if 'matchpercentage' not in data:
         raise OkcIncompleteProfileError(data['username'])
-   
+
+    height_str = data['skinny']['height']
+
+    if height_str == "":
+        height = None
+        height_inches = None
+    else:
+        height = int(100*float(re.search(r'\(([^()]+)\)', height_str).group(1)[:-1]))
+        bits = height_str.split()
+        height_inches = int(bits[0].strip("'"))*12 + int(bits[1].strip('"'))
+        
     stats = {
         'username': data['username'],
         'age': int(data['age']),
         'gender': int(data['gender']),
         'match': int(data['matchpercentage']),
         'enemy': int(data['enemypercentage']),
+        'status': int(data['status']),
+        'orientation': int(data['orientation']),
+        'height':  height,
+        'height_inches':  height_inches,
     }
+
+    # orientation
+    # 1 == straightish
+    # 2 == gayish
+    # 3 == bisexualish
+    
     return stats
 
 
@@ -138,11 +163,7 @@ class User(object):
 
     Instance attributes:
 
-    username        username (string)
-    age             age (int)
-    gender          gender (string)
-    match           match score
-    enemy           enemy score
+    stats
     essay_titles    list of essay titles (strings)
     essays          list of essay contents (strings)
     text            combined text from all essays (string)
