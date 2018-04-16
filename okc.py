@@ -148,8 +148,9 @@ def get_stats(data):
     else:
         height = int(100*float(re.search(r'\(([^()]+)\)', height_str).group(1)[:-1]))
         bits = height_str.split()
-        height_inches = int(bits[0].strip("'"))*12 + int(bits[1].strip('"'))
+        #height_inches = int(bits[0].strip("'"))*12 + int(bits[1].strip('"'))
         
+
     stats = {
         'username': data['username'],
         'age': int(data['age']),
@@ -159,9 +160,20 @@ def get_stats(data):
         'status': int(data['status']),
         'orientation': int(data['orientation']),
         'height':  height,
-        'height_inches':  height_inches,
     }
 
+    # could also add a gender_str based field. either m, f, or other
+    # or could actually pull out each of the multi-tags
+
+    #eg:
+    # gender_str = data['gender_str']
+    
+    # if gender_str not in ('M', 'F'):
+    #     for label in gender_str.split(','):
+    #         stats[label.strip()] = True
+    #what to do about "M" and "F""?
+    # need to record these also so we know who didn't add extra things
+    
     # orientation
     # 1 == straightish
     # 2 == gayish
